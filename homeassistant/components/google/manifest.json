@@ -8,5 +8,5 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "loggers": ["googleapiclient"],
-  "requirements": ["gcal-sync @ git+https://github.com/collinmoerman/gcal_sync.git@event-colors", "oauth2client==4.1.3", "ical==13.2.2"]
+  "requirements": ["gcal-sync @ https://github.com/collinmoerman/gcal_sync/archive/5599ea017309f0abd1f0806480df6fc20d13cf92.tar.gz", "oauth2client==4.1.3", "ical==13.2.2"]
 }

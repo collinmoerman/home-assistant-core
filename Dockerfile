@@ -20,6 +20,9 @@ ENV \
     UV_SYSTEM_PYTHON=true \
     UV_NO_CACHE=true
 
+ARG GCAL_SYNC_PACKAGE="gcal-sync @ https://github.com/collinmoerman/gcal_sync/archive/5599ea017309f0abd1f0806480df6fc20d13cf92.tar.gz"
+ARG CUSTOM_FRONTEND_PACKAGE="home-assistant-frontend @ https://github.com/collinmoerman/home-assistant-frontend/archive/92c818e4fae6f749d84b93508c436491f618b372.tar.gz"
+
 WORKDIR /usr/src
 
 # Home Assistant S6-Overlay
@@ -44,9 +47,14 @@ RUN \
     if ls homeassistant/home_assistant_*.whl 1> /dev/null 2>&1; then \
         uv pip install homeassistant/home_assistant_*.whl; \
     fi \
+    && grep -v -E '^(gcal-sync|gcal_sync|home-assistant-frontend)([[:space:]=@]|$)' homeassistant/requirements_all.txt > /tmp/requirements_all_without_custom.txt \
     && uv pip install \
         --no-build \
-        -r homeassistant/requirements_all.txt
+        -r /tmp/requirements_all_without_custom.txt \
+    && uv pip install \
+        --force-reinstall \
+        "${GCAL_SYNC_PACKAGE}" \
+        "${CUSTOM_FRONTEND_PACKAGE}"
 
 ## Setup Home Assistant Core
 COPY --parents LICENSE* README* homeassistant/ pyproject.toml homeassistant/
