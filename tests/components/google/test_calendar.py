@@ -486,6 +486,7 @@ async def test_http_api_event(
     event = {
         **TEST_EVENT,
         **upcoming(),
+        "colorId": "7",
     }
     mock_events_list_items([event])
     assert await component_setup()
@@ -495,10 +496,23 @@ async def test_http_api_event(
     assert response.status == HTTPStatus.OK
     events = await response.json()
     assert len(events) == 1
-    assert {k: events[0].get(k) for k in ("summary", "start", "end")} == {
+    assert {
+        k: events[0].get(k)
+        for k in (
+            "summary",
+            "start",
+            "end",
+            "color_id",
+            "background_color",
+            "foreground_color",
+        )
+    } == {
         "summary": TEST_EVENT["summary"],
         "start": {"dateTime": "2022-03-27T15:05:00+03:00"},
         "end": {"dateTime": "2022-03-27T15:10:00+03:00"},
+        "color_id": "7",
+        "background_color": "#46d6db",
+        "foreground_color": "#1d1d1d",
     }
 
 
@@ -1004,7 +1018,7 @@ async def test_websocket_delete(
         ]
     )
     assert await component_setup()
-    assert len(aioclient_mock.mock_calls) == 2
+    assert len(aioclient_mock.mock_calls) == 3
 
     aioclient_mock.clear_requests()
 
@@ -1048,7 +1062,7 @@ async def test_websocket_delete_recurring_event_instance(
         ]
     )
     assert await component_setup()
-    assert len(aioclient_mock.mock_calls) == 2
+    assert len(aioclient_mock.mock_calls) == 3
 
     # Get a time range for the first event and the second instance of the
     # recurring event.

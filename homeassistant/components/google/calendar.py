@@ -11,6 +11,7 @@ from gcal_sync.exceptions import ApiException
 from gcal_sync.model import (
     AccessRole,
     Calendar,
+    ColorDefinition,
     DateOrDatetime,
     Event,
     EventTypeEnum,
@@ -196,6 +197,18 @@ def _get_entity_descriptions(
     return entity_descriptions
 
 
+async def _async_get_event_colors(
+    calendar_service: Any,
+) -> Mapping[str, ColorDefinition]:
+    """Return Google Calendar event color definitions keyed by color id."""
+    try:
+        colors = await calendar_service.async_get_colors()
+    except ApiException:
+        _LOGGER.debug("Unable to fetch Google Calendar colors", exc_info=True)
+        return {}
+    return colors.event
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: GoogleConfigEntry,
@@ -208,6 +221,8 @@ async def async_setup_entry(
         result = await calendar_service.async_list_calendars()
     except ApiException as err:
         raise PlatformNotReady(str(err)) from err
+
+    event_colors = await _async_get_event_colors(calendar_service)
 
     entity_registry = er.async_get(hass)
     registry_entries = er.async_entries_for_config_entry(
@@ -303,6 +318,7 @@ async def async_setup_entry(
                     calendar_id,
                     entity_description,
                     unique_id,
+                    event_colors,
                 )
             )
 
@@ -345,6 +361,7 @@ class GoogleCalendarEntity(
         calendar_id: str,
         entity_description: GoogleCalendarEntityDescription,
         unique_id: str | None,
+        event_colors: Mapping[str, ColorDefinition],
     ) -> None:
         """Create the Calendar event device."""
         super().__init__(coordinator)
@@ -354,6 +371,7 @@ class GoogleCalendarEntity(
         self.entity_description = entity_description
         self._ignore_availability = entity_description.ignore_availability
         self._offset = entity_description.offset
+        self._event_colors = event_colors
         self._event: CalendarEvent | None = None
         if entity_description.entity_id:
             self.entity_id = entity_description.entity_id
@@ -425,7 +443,7 @@ class GoogleCalendarEntity(
         """Get all events in a specific time frame."""
         result_items = await self.coordinator.async_get_events(start_date, end_date)
         return [
-            _get_calendar_event(event)
+            _get_calendar_event(event, self._event_colors)
             for event in filter(self._event_filter, result_items)
         ]
 
@@ -440,7 +458,7 @@ class GoogleCalendarEntity(
             ),
             None,
         ):
-            event = _get_calendar_event(api_event)
+            event = _get_calendar_event(api_event, self._event_colors)
             if self._offset:
                 (event.summary, offset_value) = extract_offset(
                     event.summary, self._offset
@@ -507,7 +525,9 @@ class GoogleCalendarEntity(
         await self.coordinator.async_refresh()
 
 
-def _get_calendar_event(event: Event) -> CalendarEvent:
+def _get_calendar_event(
+    event: Event, event_colors: Mapping[str, ColorDefinition]
+) -> CalendarEvent:
     """Return a CalendarEvent from an API event."""
     rrule: str | None = None
     # Home Assistant expects a single RRULE: and all other
@@ -518,6 +538,8 @@ def _get_calendar_event(event: Event) -> CalendarEvent:
         and raw_rule.startswith(RRULE_PREFIX)
     ):
         rrule = raw_rule.removeprefix(RRULE_PREFIX)
+    color_id = getattr(event, "color_id", None)
+    event_color = event_colors.get(color_id) if color_id else None
     return CalendarEvent(
         uid=event.ical_uuid,
         recurrence_id=event.id if event.recurring_event_id else None,
@@ -527,6 +549,9 @@ def _get_calendar_event(event: Event) -> CalendarEvent:
         end=event.end.value,
         description=event.description,
         location=event.location,
+        color_id=color_id,
+        background_color=event_color.background if event_color else None,
+        foreground_color=event_color.foreground if event_color else None,
     )
 
 

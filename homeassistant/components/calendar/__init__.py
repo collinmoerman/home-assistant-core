@@ -48,6 +48,8 @@ from .const import (
     CONF_EVENT,
     DATA_COMPONENT,
     DOMAIN,
+    EVENT_BACKGROUND_COLOR,
+    EVENT_COLOR_ID,
     EVENT_DESCRIPTION,
     EVENT_DURATION,
     EVENT_END,
@@ -55,6 +57,7 @@ from .const import (
     EVENT_END_DATETIME,
     EVENT_IN,
     EVENT_IN_DAYS,
+    EVENT_FOREGROUND_COLOR,
     EVENT_IN_WEEKS,
     EVENT_LOCATION,
     EVENT_RECURRENCE_ID,
@@ -375,6 +378,9 @@ class CalendarEvent:
     summary: str
     description: str | None = None
     location: str | None = None
+    color_id: str | None = None
+    background_color: str | None = None
+    foreground_color: str | None = None
 
     uid: str | None = None
     recurrence_id: str | None = None
@@ -578,6 +584,9 @@ class CalendarEntity(Entity):
             "end_time": event.end_datetime_local.strftime(DATE_STR_FORMAT),
             "location": event.location or "",
             "description": event.description or "",
+            EVENT_COLOR_ID: event.color_id or "",
+            EVENT_BACKGROUND_COLOR: event.background_color or "",
+            EVENT_FOREGROUND_COLOR: event.foreground_color or "",
         }
 
     @final
@@ -804,7 +813,7 @@ class CalendarEventView(http.HomeAssistantView):
         try:
             start_date = dt_util.parse_datetime(start)
             end_date = dt_util.parse_datetime(end)
-        except ValueError, AttributeError:
+        except (ValueError, AttributeError):
             return web.Response(status=HTTPStatus.BAD_REQUEST)
         if start_date is None or end_date is None:
             return web.Response(status=HTTPStatus.BAD_REQUEST)
