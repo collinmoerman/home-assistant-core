@@ -102,6 +102,7 @@ class GoogleCalendarEntityDescription(CalendarEntityDescription):
     search: str | None
     local_sync: bool
     device_id: str
+    foreground_color: str | None = None
     event_type: EventTypeEnum | None = None
 
 
@@ -163,6 +164,7 @@ def _get_entity_descriptions(
             entity_registry_enabled_default=entity_enabled,
             device_id=data[CONF_DEVICE_ID],
             initial_color=calendar_item.background_color,
+            foreground_color=calendar_item.foreground_color,
         )
         entity_descriptions.append(entity_description)
         _LOGGER.debug(
@@ -445,7 +447,12 @@ class GoogleCalendarEntity(
         """Get all events in a specific time frame."""
         result_items = await self.coordinator.async_get_events(start_date, end_date)
         return [
-            _get_calendar_event(event, self._event_colors)
+            _get_calendar_event(
+                event,
+                self._event_colors,
+                self.entity_description.initial_color,
+                self.entity_description.foreground_color,
+            )
             for event in filter(self._event_filter, result_items)
         ]
 
@@ -460,7 +467,12 @@ class GoogleCalendarEntity(
             ),
             None,
         ):
-            event = _get_calendar_event(api_event, self._event_colors)
+            event = _get_calendar_event(
+                api_event,
+                self._event_colors,
+                self.entity_description.initial_color,
+                self.entity_description.foreground_color,
+            )
             if self._offset:
                 (event.summary, offset_value) = extract_offset(
                     event.summary, self._offset
@@ -528,7 +540,10 @@ class GoogleCalendarEntity(
 
 
 def _get_calendar_event(
-    event: Event, event_colors: Mapping[str, ColorDefinition]
+    event: Event,
+    event_colors: Mapping[str, ColorDefinition],
+    calendar_background_color: str | None,
+    calendar_foreground_color: str | None,
 ) -> CalendarEvent:
     """Return a CalendarEvent from an API event."""
     rrule: str | None = None
@@ -541,6 +556,12 @@ def _get_calendar_event(
         rrule = raw_rule.removeprefix(RRULE_PREFIX)
     color_id = getattr(event, "color_id", None)
     event_color = event_colors.get(color_id) if color_id else None
+    background_color = (
+        event_color.background if event_color else calendar_background_color
+    )
+    foreground_color = (
+        event_color.foreground if event_color else calendar_foreground_color
+    )
     return CalendarEvent(
         uid=event.ical_uuid,
         recurrence_id=event.id if event.recurring_event_id else None,
@@ -551,8 +572,8 @@ def _get_calendar_event(
         description=event.description,
         location=event.location,
         color_id=color_id,
-        background_color=event_color.background if event_color else None,
-        foreground_color=event_color.foreground if event_color else None,
+        background_color=background_color,
+        foreground_color=foreground_color,
     )
 
 
