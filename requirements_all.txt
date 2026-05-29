@@ -1054,7 +1054,7 @@ gardena-bluetooth==2.8.1
 gassist-text==0.0.14
 
 # homeassistant.components.google
-gcal-sync==8.0.0
+gcal-sync @ git+https://github.com/collinmoerman/gcal_sync.git@event-colors
 
 # homeassistant.components.aladdin_connect
 genie-partner-sdk==1.0.11

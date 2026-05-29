@@ -435,6 +435,9 @@ async def test_create_event_service_invalid_params(
                             "summary": "Future Event",
                             "description": "Future Description",
                             "location": "Future Location",
+                            "color_id": "7",
+                            "background_color": "#46d6db",
+                            "foreground_color": "#1d1d1d",
                         }
                     ]
                 }
@@ -752,6 +755,9 @@ async def test_websocket_handle_subscribe_calendar_events(
     assert events[0]["uid"] == "calendar-event-uid-1"
     assert events[0]["rrule"] == "FREQ=WEEKLY;COUNT=3"
     assert events[0]["recurrence_id"] == "20260415"
+    assert events[0]["color_id"] == "7"
+    assert events[0]["background_color"] == "#46d6db"
+    assert events[0]["foreground_color"] == "#1d1d1d"
 
 
 async def test_websocket_subscribe_updates_on_state_change(

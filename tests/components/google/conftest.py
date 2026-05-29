@@ -60,6 +60,16 @@ TEST_API_CALENDAR = {
     "defaultReminders": [],
 }
 
+TEST_COLORS = {
+    "kind": "calendar#colors",
+    "event": {
+        "7": {"background": "#46d6db", "foreground": "#1d1d1d"}
+    },
+    "calendar": {
+        "8": {"background": "#16a765", "foreground": "#000000"}
+    },
+}
+
 TEST_EVENT = {
     "summary": "Test All Day Event",
     "start": {},
@@ -240,6 +250,12 @@ def config_entry(
         },
         options=config_entry_options,
     )
+
+
+@pytest.fixture(autouse=True)
+def mock_colors(aioclient_mock: AiohttpClientMocker) -> None:
+    """Fixture to construct a fake Google Calendar colors API response."""
+    aioclient_mock.get(f"{API_BASE_URL}/colors", json=TEST_COLORS)
 
 
 @pytest.fixture
