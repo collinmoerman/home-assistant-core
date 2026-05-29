@@ -21,7 +21,7 @@ ENV \
     UV_NO_CACHE=true
 
 ARG GCAL_SYNC_PACKAGE="gcal-sync @ https://github.com/collinmoerman/gcal_sync/archive/5599ea017309f0abd1f0806480df6fc20d13cf92.tar.gz"
-ARG CUSTOM_FRONTEND_PACKAGE="home-assistant-frontend @ https://github.com/collinmoerman/home-assistant-frontend/archive/92c818e4fae6f749d84b93508c436491f618b372.tar.gz"
+ARG CUSTOM_FRONTEND_PACKAGE="home-assistant-frontend @ https://github.com/collinmoerman/home-assistant-frontend/archive/a76cc68925228fa25c4d06a5023f9ea008f9bbbc.tar.gz"
 
 WORKDIR /usr/src
 
