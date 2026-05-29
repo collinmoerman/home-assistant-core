@@ -47,10 +47,10 @@ RUN \
     if ls homeassistant/home_assistant_*.whl 1> /dev/null 2>&1; then \
         uv pip install homeassistant/home_assistant_*.whl; \
     fi \
-    && grep -v -E '^(gcal-sync|gcal_sync|home-assistant-frontend)([[:space:]=@]|$)' homeassistant/requirements_all.txt > /tmp/requirements_all_without_custom.txt \
+    && grep -v -E '^(gcal-sync|gcal_sync|home-assistant-frontend)([[:space:]=@]|$)' homeassistant/requirements_all.txt > homeassistant/requirements_all_without_custom.txt \
     && uv pip install \
         --no-build \
-        -r /tmp/requirements_all_without_custom.txt \
+        -r homeassistant/requirements_all_without_custom.txt \
     && uv pip install \
         --force-reinstall \
         "${GCAL_SYNC_PACKAGE}" \
