@@ -8,10 +8,13 @@ from datetime import datetime, timedelta
 import logging
 from typing import Any, cast
 
+import voluptuous as vol
+
 from gcal_sync.api import Range, SyncEventsRequest
 from gcal_sync.exceptions import ApiException
 from gcal_sync.model import (
     AccessRole,
+    Attendee,
     Calendar,
     ColorDefinition,
     DateOrDatetime,
@@ -23,7 +26,6 @@ from gcal_sync.store import ScopedCalendarStore
 from gcal_sync.sync import CalendarEventSyncManager
 
 from homeassistant.components.calendar import (
-    CREATE_EVENT_SCHEMA,
     ENTITY_ID_FORMAT,
     EVENT_DESCRIPTION,
     EVENT_END,
@@ -31,17 +33,22 @@ from homeassistant.components.calendar import (
     EVENT_RRULE,
     EVENT_START,
     EVENT_SUMMARY,
+    EVENT_TYPES,
     CalendarEntity,
     CalendarEntityDescription,
     CalendarEntityFeature,
     CalendarEvent,
+    MIN_NEW_EVENT_DURATION,
+    _as_local_timezone,
+    _has_consistent_timezone,
+    _has_min_duration,
     extract_offset,
     is_offset_reached,
 )
 from homeassistant.const import CONF_DEVICE_ID, CONF_ENTITIES, CONF_NAME, CONF_OFFSET
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, PlatformNotReady
-from homeassistant.helpers import entity_platform, entity_registry as er
+from homeassistant.helpers import config_validation as cv, entity_platform, entity_registry as er
 from homeassistant.helpers.entity import generate_entity_id
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -72,6 +79,56 @@ from .coordinator import CalendarQueryUpdateCoordinator, CalendarSyncUpdateCoord
 from .store import GoogleConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+
+EVENT_ATTENDEES = "attendees"
+
+GOOGLE_CREATE_EVENT_SCHEMA = vol.All(
+    cv.has_at_least_one_key(EVENT_START_DATE, EVENT_START_DATETIME, EVENT_IN),
+    cv.has_at_most_one_key(EVENT_START_DATE, EVENT_START_DATETIME, EVENT_IN),
+    cv.make_entity_service_schema(
+        {
+            vol.Required(EVENT_SUMMARY): cv.string,
+            vol.Optional(EVENT_DESCRIPTION, default=""): cv.string,
+            vol.Optional(EVENT_LOCATION): cv.string,
+            vol.Optional(EVENT_ATTENDEES, default=[]): vol.Any(
+                cv.string, vol.All(cv.ensure_list, [cv.string])
+            ),
+            vol.Inclusive(
+                EVENT_START_DATE, "dates", "Start and end dates must both be specified"
+            ): cv.date,
+            vol.Inclusive(
+                EVENT_END_DATE, "dates", "Start and end dates must both be specified"
+            ): cv.date,
+            vol.Inclusive(
+                EVENT_START_DATETIME,
+                "datetimes",
+                "Start and end datetimes must both be specified",
+            ): cv.datetime,
+            vol.Inclusive(
+                EVENT_END_DATETIME,
+                "datetimes",
+                "Start and end datetimes must both be specified",
+            ): cv.datetime,
+            vol.Optional(EVENT_IN): vol.Schema(
+                {
+                    vol.Exclusive(EVENT_IN_DAYS, EVENT_TYPES): cv.positive_int,
+                    vol.Exclusive(EVENT_IN_WEEKS, EVENT_TYPES): cv.positive_int,
+                }
+            ),
+        },
+    ),
+    _has_consistent_timezone(EVENT_START_DATETIME, EVENT_END_DATETIME),
+    _as_local_timezone(EVENT_START_DATETIME, EVENT_END_DATETIME),
+    _has_min_duration(EVENT_START_DATE, EVENT_END_DATE, MIN_NEW_EVENT_DURATION),
+    _has_min_duration(EVENT_START_DATETIME, EVENT_END_DATETIME, MIN_NEW_EVENT_DURATION),
+)
+
+
+def _attendees_from_emails(attendees: list[str] | str) -> list[Attendee]:
+    """Build Google attendee models from email strings."""
+    if isinstance(attendees, str):
+        attendees = [email.strip() for email in attendees.split(",")]
+    return [Attendee(email=email) for email in attendees if email]
 
 # Avoid syncing super old data on initial syncs. Note that old but active
 # recurring events are still included.
@@ -344,7 +401,7 @@ async def async_setup_entry(
     ):
         platform.async_register_entity_service(
             SERVICE_CREATE_EVENT,
-            CREATE_EVENT_SCHEMA,
+            GOOGLE_CREATE_EVENT_SCHEMA,
             async_create_event,
             required_features=CalendarEntityFeature.CREATE_EVENT,
         )
@@ -508,6 +565,8 @@ class GoogleCalendarEntity(
         )
         if location := kwargs.get(EVENT_LOCATION):
             event.location = location
+        if attendees := kwargs.get(EVENT_ATTENDEES):
+            event.attendees = _attendees_from_emails(attendees)
         if rrule := kwargs.get(EVENT_RRULE):
             event.recurrence = [f"{RRULE_PREFIX}{rrule}"]
 
@@ -623,6 +682,8 @@ async def async_create_event(entity: GoogleCalendarEntity, call: ServiceCall) ->
     )
     if location := call.data.get(EVENT_LOCATION):
         event.location = location
+    if attendees := call.data.get(EVENT_ATTENDEES):
+        event.attendees = _attendees_from_emails(attendees)
     try:
         await cast(
             CalendarSyncUpdateCoordinator, entity.coordinator

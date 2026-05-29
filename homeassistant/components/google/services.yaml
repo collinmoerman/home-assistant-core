@@ -73,3 +73,8 @@ create_event:
       example: "Conference Room - F123, Bldg. 002"
       selector:
         text:
+    attendees:
+      example:
+        - "person@example.com"
+      selector:
+        object:
